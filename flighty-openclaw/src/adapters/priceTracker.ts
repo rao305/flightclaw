@@ -38,7 +38,7 @@ export class FlightclawApiPriceTrackerAdapter implements PriceTrackerAdapter {
   constructor(
     private readonly baseUrl: string,
     private readonly apiKey: string,
-    private readonly fallback: PriceTrackerAdapter = new MockPriceTrackerAdapter()
+    private readonly fallback?: PriceTrackerAdapter
   ) {}
 
   async searchRoute(input: {
@@ -66,8 +66,9 @@ export class FlightclawApiPriceTrackerAdapter implements PriceTrackerAdapter {
       if (!parsed.success) throw new Error("Invalid flightclaw payload");
 
       return mapFlightclawQuote(parsed.data);
-    } catch {
-      return this.fallback.searchRoute(input);
+    } catch (err) {
+      if (this.fallback) return this.fallback.searchRoute(input);
+      throw err;
     }
   }
 }

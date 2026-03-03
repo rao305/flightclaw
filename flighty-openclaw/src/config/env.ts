@@ -18,6 +18,7 @@ const envSchema = z
     START_BRIDGE: z.enum(["true", "false"]).default("false"),
     BRIDGE_PORT: z.coerce.number().int().min(1).max(65535).default(8788),
 
+    LIVE_DATA_ONLY: z.enum(["true", "false"]).default("true"),
     MOCK_SEED: z.string().default("flighty-openclaw"),
     MOCK_FIXED_NOW: z.string().datetime({ offset: true }).optional()
   })
@@ -37,10 +38,32 @@ const envSchema = z
         message: "FLIGHTCLAW_API_KEY is required when FLIGHTCLAW_BASE_URL is set"
       });
     }
+
+    const hasLiveFlightProvider = Boolean(env.AVIATIONSTACK_API_KEY || env.FLIGHT_TRACKER_BASE_URL);
+    const hasLivePriceProvider = Boolean(env.FLIGHTCLAW_BASE_URL);
+
+    if (env.LIVE_DATA_ONLY === "true") {
+      if (!hasLiveFlightProvider) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["LIVE_DATA_ONLY"],
+          message: "LIVE_DATA_ONLY=true requires a live flight provider (AVIATIONSTACK_API_KEY or FLIGHT_TRACKER_BASE_URL+FLIGHT_TRACKER_API_KEY)"
+        });
+      }
+
+      if (!hasLivePriceProvider) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["LIVE_DATA_ONLY"],
+          message: "LIVE_DATA_ONLY=true requires FLIGHTCLAW_BASE_URL+FLIGHTCLAW_API_KEY"
+        });
+      }
+    }
   });
 
 export type RuntimeConfig = z.infer<typeof envSchema> & {
   startBridge: boolean;
+  liveDataOnly: boolean;
 };
 
 export function loadRuntimeConfig(source: NodeJS.ProcessEnv = process.env): RuntimeConfig {
@@ -52,6 +75,7 @@ export function loadRuntimeConfig(source: NodeJS.ProcessEnv = process.env): Runt
 
   return {
     ...parsed.data,
-    startBridge: parsed.data.START_BRIDGE === "true"
+    startBridge: parsed.data.START_BRIDGE === "true",
+    liveDataOnly: parsed.data.LIVE_DATA_ONLY === "true"
   };
 }

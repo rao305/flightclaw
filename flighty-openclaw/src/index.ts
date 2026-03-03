@@ -40,14 +40,17 @@ async function main() {
     fixedNowIso: config.MOCK_FIXED_NOW
   };
 
+  const liveFallbackFlight = config.liveDataOnly ? undefined : new MockFlightTrackerAdapter(mockOptions);
+  const liveFallbackPrice = config.liveDataOnly ? undefined : new MockPriceTrackerAdapter(mockOptions);
+
   const flightTracker = config.AVIATIONSTACK_API_KEY
-    ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter(mockOptions))
+    ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, liveFallbackFlight)
     : config.FLIGHT_TRACKER_BASE_URL && config.FLIGHT_TRACKER_API_KEY
-      ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY)
+      ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY, liveFallbackFlight)
       : new MockFlightTrackerAdapter(mockOptions);
 
   const priceTracker = config.FLIGHTCLAW_BASE_URL && config.FLIGHTCLAW_API_KEY
-    ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY)
+    ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY, liveFallbackPrice)
     : new MockPriceTrackerAdapter(mockOptions);
 
   const engine = new FlightyEngine(db, flightTracker, priceTracker, notifier);
@@ -56,7 +59,9 @@ async function main() {
   const rl = readline.createInterface({ input, output });
 
   console.log("Flighty OpenClaw MVP (local engine) started.");
-  console.log(`Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, mockSeed=${config.MOCK_SEED}`);
+  console.log(
+    `Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, liveDataOnly=${config.liveDataOnly}, mockSeed=${config.MOCK_SEED}`
+  );
   if (config.MOCK_FIXED_NOW) {
     console.log(`Mock fixed time enabled: ${config.MOCK_FIXED_NOW}`);
   }

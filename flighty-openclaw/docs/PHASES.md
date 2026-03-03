@@ -60,12 +60,17 @@ This file is the checkpoint contract with Rohit. After each phase, update this f
 
 ## Phase 3 — Product Features (MVP Complete)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Completed (2026-03-03)
 
 ### Goals
 - Confirm command intents and responses.
 - Tighten watch/alert user flows.
 - Add integration smoke script.
+
+### Deliverables
+- [x] Live-data-only runtime mode (`LIVE_DATA_ONLY=true` by default)
+- [x] No mock fallback when live mode is enabled
+- [x] Testing mode explicitly gated behind `LIVE_DATA_ONLY=false`
 
 ---
 

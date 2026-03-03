@@ -173,13 +173,14 @@ var AviationStackFlightTrackerAdapter = class {
       const parsed = aviationStackResponseSchema.safeParse(raw);
       if (!parsed.success) throw new Error("Invalid aviationstack payload");
       return mapAviationStackToSnapshot(parsed.data);
-    } catch {
-      return this.fallback.getFlightStatus(ref);
+    } catch (err) {
+      if (this.fallback) return this.fallback.getFlightStatus(ref);
+      throw err;
     }
   }
 };
 var HttpFlightTrackerAdapter = class {
-  constructor(baseUrl, apiKey, fallback = new MockFlightTrackerAdapter()) {
+  constructor(baseUrl, apiKey, fallback) {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
     this.fallback = fallback;
@@ -219,8 +220,9 @@ var HttpFlightTrackerAdapter = class {
         rawJson: response,
         createdAt: (/* @__PURE__ */ new Date()).toISOString()
       };
-    } catch {
-      return this.fallback.getFlightStatus(ref);
+    } catch (err) {
+      if (this.fallback) return this.fallback.getFlightStatus(ref);
+      throw err;
     }
   }
 };
@@ -278,7 +280,7 @@ var MockPriceTrackerAdapter = class {
   }
 };
 var FlightclawApiPriceTrackerAdapter = class {
-  constructor(baseUrl, apiKey, fallback = new MockPriceTrackerAdapter()) {
+  constructor(baseUrl, apiKey, fallback) {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
     this.fallback = fallback;
@@ -300,8 +302,9 @@ var FlightclawApiPriceTrackerAdapter = class {
       const parsed = flightclawResponseSchema.safeParse(raw);
       if (!parsed.success) throw new Error("Invalid flightclaw payload");
       return mapFlightclawQuote(parsed.data);
-    } catch {
-      return this.fallback.searchRoute(input2);
+    } catch (err) {
+      if (this.fallback) return this.fallback.searchRoute(input2);
+      throw err;
     }
   }
 };
@@ -829,6 +832,7 @@ var envSchema = z3.object({
   OPENCLAW_RELAY_TOKEN: z3.string().optional(),
   START_BRIDGE: z3.enum(["true", "false"]).default("false"),
   BRIDGE_PORT: z3.coerce.number().int().min(1).max(65535).default(8788),
+  LIVE_DATA_ONLY: z3.enum(["true", "false"]).default("true"),
   MOCK_SEED: z3.string().default("flighty-openclaw"),
   MOCK_FIXED_NOW: z3.string().datetime({ offset: true }).optional()
 }).superRefine((env, ctx) => {
@@ -846,6 +850,24 @@ var envSchema = z3.object({
       message: "FLIGHTCLAW_API_KEY is required when FLIGHTCLAW_BASE_URL is set"
     });
   }
+  const hasLiveFlightProvider = Boolean(env.AVIATIONSTACK_API_KEY || env.FLIGHT_TRACKER_BASE_URL);
+  const hasLivePriceProvider = Boolean(env.FLIGHTCLAW_BASE_URL);
+  if (env.LIVE_DATA_ONLY === "true") {
+    if (!hasLiveFlightProvider) {
+      ctx.addIssue({
+        code: z3.ZodIssueCode.custom,
+        path: ["LIVE_DATA_ONLY"],
+        message: "LIVE_DATA_ONLY=true requires a live flight provider (AVIATIONSTACK_API_KEY or FLIGHT_TRACKER_BASE_URL+FLIGHT_TRACKER_API_KEY)"
+      });
+    }
+    if (!hasLivePriceProvider) {
+      ctx.addIssue({
+        code: z3.ZodIssueCode.custom,
+        path: ["LIVE_DATA_ONLY"],
+        message: "LIVE_DATA_ONLY=true requires FLIGHTCLAW_BASE_URL+FLIGHTCLAW_API_KEY"
+      });
+    }
+  }
 });
 function loadRuntimeConfig(source = process.env) {
   const parsed = envSchema.safeParse(source);
@@ -855,7 +877,8 @@ function loadRuntimeConfig(source = process.env) {
   }
   return {
     ...parsed.data,
-    startBridge: parsed.data.START_BRIDGE === "true"
+    startBridge: parsed.data.START_BRIDGE === "true",
+    liveDataOnly: parsed.data.LIVE_DATA_ONLY === "true"
   };
 }
 
@@ -924,13 +947,17 @@ async function main() {
     seed: config.MOCK_SEED,
     fixedNowIso: config.MOCK_FIXED_NOW
   };
-  const flightTracker = config.AVIATIONSTACK_API_KEY ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter(mockOptions)) : config.FLIGHT_TRACKER_BASE_URL && config.FLIGHT_TRACKER_API_KEY ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY) : new MockFlightTrackerAdapter(mockOptions);
-  const priceTracker = config.FLIGHTCLAW_BASE_URL && config.FLIGHTCLAW_API_KEY ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY) : new MockPriceTrackerAdapter(mockOptions);
+  const liveFallbackFlight = config.liveDataOnly ? void 0 : new MockFlightTrackerAdapter(mockOptions);
+  const liveFallbackPrice = config.liveDataOnly ? void 0 : new MockPriceTrackerAdapter(mockOptions);
+  const flightTracker = config.AVIATIONSTACK_API_KEY ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, liveFallbackFlight) : config.FLIGHT_TRACKER_BASE_URL && config.FLIGHT_TRACKER_API_KEY ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY, liveFallbackFlight) : new MockFlightTrackerAdapter(mockOptions);
+  const priceTracker = config.FLIGHTCLAW_BASE_URL && config.FLIGHTCLAW_API_KEY ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY, liveFallbackPrice) : new MockPriceTrackerAdapter(mockOptions);
   const engine = new FlightyEngine(db, flightTracker, priceTracker, notifier);
   startSchedulers(engine);
   const rl = readline.createInterface({ input, output });
   console.log("Flighty OpenClaw MVP (local engine) started.");
-  console.log(`Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, mockSeed=${config.MOCK_SEED}`);
+  console.log(
+    `Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, liveDataOnly=${config.liveDataOnly}, mockSeed=${config.MOCK_SEED}`
+  );
   if (config.MOCK_FIXED_NOW) {
     console.log(`Mock fixed time enabled: ${config.MOCK_FIXED_NOW}`);
   }

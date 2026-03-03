@@ -45,9 +45,20 @@ Runtime config is validated at boot. The process exits early if critical pairs a
 - `FLIGHT_TRACKER_BASE_URL` without `FLIGHT_TRACKER_API_KEY`
 - `FLIGHTCLAW_BASE_URL` without `FLIGHTCLAW_API_KEY`
 
+## Live-data-only mode (recommended for prod)
+
+Set:
+- `LIVE_DATA_ONLY=true`
+
+Behavior:
+- Startup fails if live providers are not fully configured.
+- Adapter/network failures do **not** fall back to mocks.
+- Ensures no hardcoded/mock flight data is used in production.
+
 ## Deterministic demo mode
 
 For reproducible local testing:
+- Set `LIVE_DATA_ONLY=false`
 - Set `MOCK_SEED` to any fixed string
 - Optionally set `MOCK_FIXED_NOW` (ISO datetime with offset)
 

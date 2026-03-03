@@ -41,7 +41,7 @@ export class MockFlightTrackerAdapter implements FlightTrackerAdapter {
 }
 
 export class AviationStackFlightTrackerAdapter implements FlightTrackerAdapter {
-  constructor(private readonly apiKey: string, private readonly fallback: FlightTrackerAdapter) {}
+  constructor(private readonly apiKey: string, private readonly fallback?: FlightTrackerAdapter) {}
 
   async getFlightStatus(ref: FlightRef): Promise<FlightSnapshot> {
     try {
@@ -56,8 +56,9 @@ export class AviationStackFlightTrackerAdapter implements FlightTrackerAdapter {
       if (!parsed.success) throw new Error("Invalid aviationstack payload");
 
       return mapAviationStackToSnapshot(parsed.data);
-    } catch {
-      return this.fallback.getFlightStatus(ref);
+    } catch (err) {
+      if (this.fallback) return this.fallback.getFlightStatus(ref);
+      throw err;
     }
   }
 }
@@ -66,7 +67,7 @@ export class HttpFlightTrackerAdapter implements FlightTrackerAdapter {
   constructor(
     private readonly baseUrl: string,
     private readonly apiKey: string,
-    private readonly fallback: FlightTrackerAdapter = new MockFlightTrackerAdapter()
+    private readonly fallback?: FlightTrackerAdapter
   ) {}
 
   async getFlightStatus(ref: FlightRef): Promise<FlightSnapshot> {
@@ -106,8 +107,9 @@ export class HttpFlightTrackerAdapter implements FlightTrackerAdapter {
         rawJson: response,
         createdAt: new Date().toISOString()
       };
-    } catch {
-      return this.fallback.getFlightStatus(ref);
+    } catch (err) {
+      if (this.fallback) return this.fallback.getFlightStatus(ref);
+      throw err;
     }
   }
 }
