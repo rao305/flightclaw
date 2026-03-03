@@ -2,21 +2,22 @@ import type { FlightRef, FlightSnapshot, FlightStatus } from "../types/models.js
 import type { AviationStackResponse } from "../types/providers.js";
 import { aviationStackResponseSchema } from "../types/providers.js";
 import { fetchJsonWithRetry } from "../utils/http.js";
+import { mockNow, seededRandom, type MockOptions } from "../utils/mock.js";
 
 export interface FlightTrackerAdapter {
   getFlightStatus(ref: FlightRef): Promise<FlightSnapshot>;
 }
 
-const randomStatus = (): FlightStatus => {
-  const statuses: FlightStatus[] = ["scheduled", "active", "delayed", "landed"];
-  return statuses[Math.floor(Math.random() * statuses.length)]!;
-};
+const statuses: FlightStatus[] = ["scheduled", "active", "delayed", "landed"];
 
 export class MockFlightTrackerAdapter implements FlightTrackerAdapter {
+  constructor(private readonly opts: MockOptions = {}) {}
+
   async getFlightStatus(ref: FlightRef): Promise<FlightSnapshot> {
-    const now = new Date();
-    const status = randomStatus();
-    const delayMinutes = status === "delayed" ? 20 + Math.floor(Math.random() * 50) : 0;
+    const rng = seededRandom(`${this.opts.seed ?? "default"}:${ref.airlineCode}:${ref.flightNumber}:${ref.flightDate}`);
+    const now = mockNow(this.opts.fixedNowIso);
+    const status = statuses[Math.floor(rng() * statuses.length)]!;
+    const delayMinutes = status === "delayed" ? 20 + Math.floor(rng() * 50) : 0;
 
     return {
       trackedFlightId: "",
@@ -34,7 +35,7 @@ export class MockFlightTrackerAdapter implements FlightTrackerAdapter {
       altitudeFt: status === "active" ? 31000 : undefined,
       speedKts: status === "active" ? 440 : undefined,
       rawJson: { mock: true, ref },
-      createdAt: new Date().toISOString()
+      createdAt: now.toISOString()
     };
   }
 }

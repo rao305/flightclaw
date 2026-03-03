@@ -2,6 +2,7 @@ import type { PriceQuote } from "../types/models.js";
 import type { FlightclawResponse } from "../types/providers.js";
 import { flightclawResponseSchema } from "../types/providers.js";
 import { fetchJsonWithRetry } from "../utils/http.js";
+import { mockNow, seededRandom, type MockOptions } from "../utils/mock.js";
 
 export interface PriceTrackerAdapter {
   searchRoute(input: {
@@ -13,12 +14,22 @@ export interface PriceTrackerAdapter {
 }
 
 export class MockPriceTrackerAdapter implements PriceTrackerAdapter {
-  async searchRoute(): Promise<PriceQuote> {
-    const amountUsd = Math.round((180 + Math.random() * 220) * 100) / 100;
+  constructor(private readonly opts: MockOptions = {}) {}
+
+  async searchRoute(input: {
+    origin: string;
+    destination: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<PriceQuote> {
+    const rng = seededRandom(
+      `${this.opts.seed ?? "default"}:${input.origin}:${input.destination}:${input.startDate}:${input.endDate}`
+    );
+    const amountUsd = Math.round((180 + rng() * 220) * 100) / 100;
     return {
       amountUsd,
       deeplink: "https://flightclaw.com",
-      observedAt: new Date().toISOString()
+      observedAt: mockNow(this.opts.fixedNowIso).toISOString()
     };
   }
 }

@@ -5,6 +5,7 @@ import { FlightyEngine } from "./orchestrator/engine.js";
 import { startSchedulers } from "./jobs/scheduler.js";
 import { InMemoryDatabase } from "./db/store.js";
 import { createPostgresDatabase } from "./db/postgres.js";
+import { loadRuntimeConfig } from "./config/env.js";
 import {
   ConsoleNotifier,
   OpenClawRelayNotifier,
@@ -20,48 +21,51 @@ import { OpenClawRelayClient } from "./adapters/openclawRelay.js";
 import { startNotifierBridge } from "./bridge/notifier-bridge.js";
 
 async function main() {
-  if (process.env.START_BRIDGE === "true") {
-    startNotifierBridge(Number(process.env.BRIDGE_PORT ?? 8788));
+  const config = loadRuntimeConfig();
+
+  if (config.startBridge) {
+    startNotifierBridge(config.BRIDGE_PORT);
   }
 
-  const db = process.env.DATABASE_URL
-    ? createPostgresDatabase(process.env.DATABASE_URL)
-    : new InMemoryDatabase();
+  const db = config.DATABASE_URL ? createPostgresDatabase(config.DATABASE_URL) : new InMemoryDatabase();
 
-  const notifier = process.env.OPENCLAW_RELAY_URL
-    ? new OpenClawRelayNotifier(
-        new OpenClawRelayClient(process.env.OPENCLAW_RELAY_URL, process.env.OPENCLAW_RELAY_TOKEN)
-      )
-    : process.env.NOTIFY_WEBHOOK_URL
-      ? new WebhookNotifier(process.env.NOTIFY_WEBHOOK_URL)
+  const notifier = config.OPENCLAW_RELAY_URL
+    ? new OpenClawRelayNotifier(new OpenClawRelayClient(config.OPENCLAW_RELAY_URL, config.OPENCLAW_RELAY_TOKEN))
+    : config.NOTIFY_WEBHOOK_URL
+      ? new WebhookNotifier(config.NOTIFY_WEBHOOK_URL)
       : new ConsoleNotifier();
 
-  const flightTracker = process.env.AVIATIONSTACK_API_KEY
-    ? new AviationStackFlightTrackerAdapter(process.env.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter())
-    : process.env.FLIGHT_TRACKER_BASE_URL && process.env.FLIGHT_TRACKER_API_KEY
-      ? new HttpFlightTrackerAdapter(
-          process.env.FLIGHT_TRACKER_BASE_URL,
-          process.env.FLIGHT_TRACKER_API_KEY
-        )
-      : new MockFlightTrackerAdapter();
+  const mockOptions = {
+    seed: config.MOCK_SEED,
+    fixedNowIso: config.MOCK_FIXED_NOW
+  };
 
-  const priceTracker = process.env.FLIGHTCLAW_BASE_URL && process.env.FLIGHTCLAW_API_KEY
-    ? new FlightclawApiPriceTrackerAdapter(process.env.FLIGHTCLAW_BASE_URL, process.env.FLIGHTCLAW_API_KEY)
-    : new MockPriceTrackerAdapter();
+  const flightTracker = config.AVIATIONSTACK_API_KEY
+    ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter(mockOptions))
+    : config.FLIGHT_TRACKER_BASE_URL && config.FLIGHT_TRACKER_API_KEY
+      ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY)
+      : new MockFlightTrackerAdapter(mockOptions);
+
+  const priceTracker = config.FLIGHTCLAW_BASE_URL && config.FLIGHTCLAW_API_KEY
+    ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY)
+    : new MockPriceTrackerAdapter(mockOptions);
 
   const engine = new FlightyEngine(db, flightTracker, priceTracker, notifier);
   startSchedulers(engine);
 
   const rl = readline.createInterface({ input, output });
-  const user = process.env.DEMO_USER_KEY ?? "whatsapp:+16692602830";
 
   console.log("Flighty OpenClaw MVP (local engine) started.");
+  console.log(`Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, mockSeed=${config.MOCK_SEED}`);
+  if (config.MOCK_FIXED_NOW) {
+    console.log(`Mock fixed time enabled: ${config.MOCK_FIXED_NOW}`);
+  }
   console.log("Try: Track AA100 on 2026-04-10 from JFK to LAX");
 
   while (true) {
     const msg = await rl.question("\n> ");
     if (msg.trim().toLowerCase() === "exit") break;
-    const reply = await engine.handleMessage(user, msg);
+    const reply = await engine.handleMessage(config.DEMO_USER_KEY, msg);
     console.log(`\n${reply}`);
   }
 

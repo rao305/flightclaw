@@ -104,16 +104,39 @@ var flightclawResponseSchema = z.object({
   ).optional()
 });
 
+// src/utils/mock.ts
+function mockNow(fixedNowIso) {
+  return fixedNowIso ? new Date(fixedNowIso) : /* @__PURE__ */ new Date();
+}
+function seededRandom(seed) {
+  let state = hash32(seed) || 1;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) % 1e6 / 1e6;
+  };
+}
+function hash32(input2) {
+  let hash = 2166136261;
+  for (let i = 0; i < input2.length; i++) {
+    hash ^= input2.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 // src/adapters/flightTracker.ts
-var randomStatus = () => {
-  const statuses = ["scheduled", "active", "delayed", "landed"];
-  return statuses[Math.floor(Math.random() * statuses.length)];
-};
+var statuses = ["scheduled", "active", "delayed", "landed"];
 var MockFlightTrackerAdapter = class {
+  constructor(opts = {}) {
+    this.opts = opts;
+  }
   async getFlightStatus(ref) {
-    const now = /* @__PURE__ */ new Date();
-    const status = randomStatus();
-    const delayMinutes2 = status === "delayed" ? 20 + Math.floor(Math.random() * 50) : 0;
+    const rng = seededRandom(`${this.opts.seed ?? "default"}:${ref.airlineCode}:${ref.flightNumber}:${ref.flightDate}`);
+    const now = mockNow(this.opts.fixedNowIso);
+    const status = statuses[Math.floor(rng() * statuses.length)];
+    const delayMinutes2 = status === "delayed" ? 20 + Math.floor(rng() * 50) : 0;
     return {
       trackedFlightId: "",
       status,
@@ -130,7 +153,7 @@ var MockFlightTrackerAdapter = class {
       altitudeFt: status === "active" ? 31e3 : void 0,
       speedKts: status === "active" ? 440 : void 0,
       rawJson: { mock: true, ref },
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      createdAt: now.toISOString()
     };
   }
 };
@@ -239,12 +262,18 @@ function normalizeStatus(status) {
 
 // src/adapters/priceTracker.ts
 var MockPriceTrackerAdapter = class {
-  async searchRoute() {
-    const amountUsd = Math.round((180 + Math.random() * 220) * 100) / 100;
+  constructor(opts = {}) {
+    this.opts = opts;
+  }
+  async searchRoute(input2) {
+    const rng = seededRandom(
+      `${this.opts.seed ?? "default"}:${input2.origin}:${input2.destination}:${input2.startDate}:${input2.endDate}`
+    );
+    const amountUsd = Math.round((180 + rng() * 220) * 100) / 100;
     return {
       amountUsd,
       deeplink: "https://flightclaw.com",
-      observedAt: (/* @__PURE__ */ new Date()).toISOString()
+      observedAt: mockNow(this.opts.fixedNowIso).toISOString()
     };
   }
 };
@@ -473,12 +502,22 @@ ${flightCard(tracked, snap)}`;
 
 // src/jobs/scheduler.ts
 function startSchedulers(engine) {
+  safeRun("tracked-flight poll", () => engine.pollTrackedFlights());
+  safeRun("price-watch poll", () => engine.pollPriceWatches());
   setInterval(() => {
-    void engine.pollTrackedFlights();
+    safeRun("tracked-flight poll", () => engine.pollTrackedFlights());
   }, 2 * 6e4);
   setInterval(() => {
-    void engine.pollPriceWatches();
+    safeRun("price-watch poll", () => engine.pollPriceWatches());
   }, 5 * 6e4);
+}
+async function safeRun(label, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[scheduler] ${label} failed: ${message}`);
+  }
 }
 
 // src/db/store.ts
@@ -775,6 +814,51 @@ function createPostgresDatabase(databaseUrl) {
   return new PostgresDatabase(pool);
 }
 
+// src/config/env.ts
+import { z as z3 } from "zod";
+var envSchema = z3.object({
+  DEMO_USER_KEY: z3.string().min(1).default("whatsapp:+16692602830"),
+  AVIATIONSTACK_API_KEY: z3.string().optional(),
+  FLIGHT_TRACKER_BASE_URL: z3.string().url().optional(),
+  FLIGHT_TRACKER_API_KEY: z3.string().optional(),
+  FLIGHTCLAW_BASE_URL: z3.string().url().optional(),
+  FLIGHTCLAW_API_KEY: z3.string().optional(),
+  DATABASE_URL: z3.string().optional(),
+  NOTIFY_WEBHOOK_URL: z3.string().url().optional(),
+  OPENCLAW_RELAY_URL: z3.string().url().optional(),
+  OPENCLAW_RELAY_TOKEN: z3.string().optional(),
+  START_BRIDGE: z3.enum(["true", "false"]).default("false"),
+  BRIDGE_PORT: z3.coerce.number().int().min(1).max(65535).default(8788),
+  MOCK_SEED: z3.string().default("flighty-openclaw"),
+  MOCK_FIXED_NOW: z3.string().datetime({ offset: true }).optional()
+}).superRefine((env, ctx) => {
+  if (env.FLIGHT_TRACKER_BASE_URL && !env.FLIGHT_TRACKER_API_KEY) {
+    ctx.addIssue({
+      code: z3.ZodIssueCode.custom,
+      path: ["FLIGHT_TRACKER_API_KEY"],
+      message: "FLIGHT_TRACKER_API_KEY is required when FLIGHT_TRACKER_BASE_URL is set"
+    });
+  }
+  if (env.FLIGHTCLAW_BASE_URL && !env.FLIGHTCLAW_API_KEY) {
+    ctx.addIssue({
+      code: z3.ZodIssueCode.custom,
+      path: ["FLIGHTCLAW_API_KEY"],
+      message: "FLIGHTCLAW_API_KEY is required when FLIGHTCLAW_BASE_URL is set"
+    });
+  }
+});
+function loadRuntimeConfig(source = process.env) {
+  const parsed = envSchema.safeParse(source);
+  if (!parsed.success) {
+    const details = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid runtime configuration: ${details}`);
+  }
+  return {
+    ...parsed.data,
+    startBridge: parsed.data.START_BRIDGE === "true"
+  };
+}
+
 // src/adapters/openclawRelay.ts
 var OpenClawRelayClient = class {
   constructor(relayUrl, relayToken) {
@@ -830,28 +914,31 @@ function startNotifierBridge(port = 8788) {
 
 // src/index.ts
 async function main() {
-  if (process.env.START_BRIDGE === "true") {
-    startNotifierBridge(Number(process.env.BRIDGE_PORT ?? 8788));
+  const config = loadRuntimeConfig();
+  if (config.startBridge) {
+    startNotifierBridge(config.BRIDGE_PORT);
   }
-  const db = process.env.DATABASE_URL ? createPostgresDatabase(process.env.DATABASE_URL) : new InMemoryDatabase();
-  const notifier = process.env.OPENCLAW_RELAY_URL ? new OpenClawRelayNotifier(
-    new OpenClawRelayClient(process.env.OPENCLAW_RELAY_URL, process.env.OPENCLAW_RELAY_TOKEN)
-  ) : process.env.NOTIFY_WEBHOOK_URL ? new WebhookNotifier(process.env.NOTIFY_WEBHOOK_URL) : new ConsoleNotifier();
-  const flightTracker = process.env.AVIATIONSTACK_API_KEY ? new AviationStackFlightTrackerAdapter(process.env.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter()) : process.env.FLIGHT_TRACKER_BASE_URL && process.env.FLIGHT_TRACKER_API_KEY ? new HttpFlightTrackerAdapter(
-    process.env.FLIGHT_TRACKER_BASE_URL,
-    process.env.FLIGHT_TRACKER_API_KEY
-  ) : new MockFlightTrackerAdapter();
-  const priceTracker = process.env.FLIGHTCLAW_BASE_URL && process.env.FLIGHTCLAW_API_KEY ? new FlightclawApiPriceTrackerAdapter(process.env.FLIGHTCLAW_BASE_URL, process.env.FLIGHTCLAW_API_KEY) : new MockPriceTrackerAdapter();
+  const db = config.DATABASE_URL ? createPostgresDatabase(config.DATABASE_URL) : new InMemoryDatabase();
+  const notifier = config.OPENCLAW_RELAY_URL ? new OpenClawRelayNotifier(new OpenClawRelayClient(config.OPENCLAW_RELAY_URL, config.OPENCLAW_RELAY_TOKEN)) : config.NOTIFY_WEBHOOK_URL ? new WebhookNotifier(config.NOTIFY_WEBHOOK_URL) : new ConsoleNotifier();
+  const mockOptions = {
+    seed: config.MOCK_SEED,
+    fixedNowIso: config.MOCK_FIXED_NOW
+  };
+  const flightTracker = config.AVIATIONSTACK_API_KEY ? new AviationStackFlightTrackerAdapter(config.AVIATIONSTACK_API_KEY, new MockFlightTrackerAdapter(mockOptions)) : config.FLIGHT_TRACKER_BASE_URL && config.FLIGHT_TRACKER_API_KEY ? new HttpFlightTrackerAdapter(config.FLIGHT_TRACKER_BASE_URL, config.FLIGHT_TRACKER_API_KEY) : new MockFlightTrackerAdapter(mockOptions);
+  const priceTracker = config.FLIGHTCLAW_BASE_URL && config.FLIGHTCLAW_API_KEY ? new FlightclawApiPriceTrackerAdapter(config.FLIGHTCLAW_BASE_URL, config.FLIGHTCLAW_API_KEY) : new MockPriceTrackerAdapter(mockOptions);
   const engine = new FlightyEngine(db, flightTracker, priceTracker, notifier);
   startSchedulers(engine);
   const rl = readline.createInterface({ input, output });
-  const user = process.env.DEMO_USER_KEY ?? "whatsapp:+16692602830";
   console.log("Flighty OpenClaw MVP (local engine) started.");
+  console.log(`Mode: ${config.DATABASE_URL ? "postgres" : "in-memory"} DB, mockSeed=${config.MOCK_SEED}`);
+  if (config.MOCK_FIXED_NOW) {
+    console.log(`Mock fixed time enabled: ${config.MOCK_FIXED_NOW}`);
+  }
   console.log("Try: Track AA100 on 2026-04-10 from JFK to LAX");
   while (true) {
     const msg = await rl.question("\n> ");
     if (msg.trim().toLowerCase() === "exit") break;
-    const reply = await engine.handleMessage(user, msg);
+    const reply = await engine.handleMessage(config.DEMO_USER_KEY, msg);
     console.log(`
 ${reply}`);
   }

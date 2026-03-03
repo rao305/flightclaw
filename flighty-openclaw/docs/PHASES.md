@@ -43,12 +43,18 @@ This file is the checkpoint contract with Rohit. After each phase, update this f
 
 ## Phase 2 — Runtime Hardening
 
-**Status:** ⏳ Planned
+**Status:** ✅ Completed (2026-03-03)
 
 ### Goals
 - Add startup health checks and explicit config validation.
 - Improve error handling around providers/notifier failures.
 - Add deterministic test fixture mode for demo reproducibility.
+
+### Deliverables
+- [x] Runtime env schema validation (`src/config/env.ts`)
+- [x] Scheduler error guards (`src/jobs/scheduler.ts`)
+- [x] Deterministic mock support (`MOCK_SEED`, `MOCK_FIXED_NOW`)
+- [x] Runbook + env docs updated
 
 ---
 

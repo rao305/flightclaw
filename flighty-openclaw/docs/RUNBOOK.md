@@ -37,6 +37,19 @@ Wire this endpoint to your OpenClaw delivery worker/service.
 
 - If provider down: adapter falls back to mock source (degraded mode for dev continuity).
 - If notifier fails: fallback notifier logs to console.
+- Scheduler loops are wrapped with error guards and log failures instead of crashing the runtime.
+
+## Startup validation
+
+Runtime config is validated at boot. The process exits early if critical pairs are incomplete, e.g.:
+- `FLIGHT_TRACKER_BASE_URL` without `FLIGHT_TRACKER_API_KEY`
+- `FLIGHTCLAW_BASE_URL` without `FLIGHTCLAW_API_KEY`
+
+## Deterministic demo mode
+
+For reproducible local testing:
+- Set `MOCK_SEED` to any fixed string
+- Optionally set `MOCK_FIXED_NOW` (ISO datetime with offset)
 
 ## Deploy checklist (initial)
 
