@@ -13,9 +13,10 @@ Flighty-style agent skeleton on OpenClaw runtime.
 - Database abstraction with:
   - in-memory DB for local demo
   - Postgres adapter for persistent runtime
-- HTTP adapter layer with fallback-to-mock for:
+- HTTP adapter layer for live providers:
   - flight status provider
   - flightclaw price provider
+- Live-data-only production mode (`LIVE_DATA_ONLY=true`) with no mock fallback
 - Notifier abstraction:
   - console notifier
   - webhook notifier transport
@@ -33,6 +34,9 @@ Flighty-style agent skeleton on OpenClaw runtime.
 
 ```bash
 npm install
+npm run typecheck
+npm run build
+npm run smoke
 npm run dev
 ```
 
