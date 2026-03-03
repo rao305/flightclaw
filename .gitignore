@@ -1,0 +1,18 @@
+# Global
+.DS_Store
+*.log
+*.tmp
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OpenClaw local runtime state
+.openclaw/
+.pi/
