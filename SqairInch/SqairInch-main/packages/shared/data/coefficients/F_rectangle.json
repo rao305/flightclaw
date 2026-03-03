@@ -1,0 +1,76 @@
+{
+  "zones": {
+    "shoulders": {
+      "intercept": 30,
+      "heightCm": 0.16,
+      "weightKg": 0.04,
+      "bmi": 0.18,
+      "age": 0.01,
+      "minCm": 32,
+      "maxCm": 52
+    },
+    "bust_chest": {
+      "intercept": 68,
+      "heightCm": 0.2,
+      "weightKg": 0.32,
+      "bmi": 0.45,
+      "age": 0.01,
+      "minCm": 72,
+      "maxCm": 130
+    },
+    "waist": {
+      "intercept": 52,
+      "heightCm": 0.14,
+      "weightKg": 0.4,
+      "bmi": 0.48,
+      "age": 0.02,
+      "minCm": 52,
+      "maxCm": 130
+    },
+    "hips": {
+      "intercept": 72,
+      "heightCm": 0.18,
+      "weightKg": 0.35,
+      "bmi": 0.38,
+      "age": 0.01,
+      "minCm": 75,
+      "maxCm": 145
+    },
+    "thigh": {
+      "intercept": 42,
+      "heightCm": 0.16,
+      "weightKg": 0.22,
+      "bmi": 0.28,
+      "age": 0,
+      "minCm": 42,
+      "maxCm": 82
+    },
+    "inseam": {
+      "intercept": 52,
+      "heightCm": 0.27,
+      "weightKg": 0.02,
+      "bmi": 0.04,
+      "age": -0.02,
+      "minCm": 58,
+      "maxCm": 92
+    },
+    "sleeve_length": {
+      "intercept": 38,
+      "heightCm": 0.2,
+      "weightKg": 0.03,
+      "bmi": 0.06,
+      "age": 0,
+      "minCm": 48,
+      "maxCm": 82
+    },
+    "torso_length": {
+      "intercept": 44,
+      "heightCm": 0.24,
+      "weightKg": 0.03,
+      "bmi": 0.05,
+      "age": 0,
+      "minCm": 48,
+      "maxCm": 82
+    }
+  }
+}

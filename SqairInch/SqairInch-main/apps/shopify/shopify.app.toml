@@ -1,0 +1,24 @@
+name = "Sqairinch"
+client_id = "{{ SHOPIFY_API_KEY }}"
+application_url = "{{ APP_URL }}"
+embedded = true
+
+[access_scopes]
+  scopes = "read_products,write_products"
+
+[auth]
+  redirect_urls = [
+    "{{ APP_URL }}/api/auth/callback",
+    "https://localhost/api/auth/callback"
+  ]
+
+[webhooks]
+  api_version = "2024-07"
+
+[pos]
+  embedded = false
+
+[app_proxy]
+  url = "{{ APP_URL }}/api/apps/sqairinch"
+  subpath = "sqairinch"
+  prefix = "apps"

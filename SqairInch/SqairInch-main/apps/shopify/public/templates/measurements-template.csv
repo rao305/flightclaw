@@ -1,0 +1,3 @@
+shopify_variant_id,shopify_product_id,size_label,category,fabric_type,waist_cm,hips_cm,bust_chest_cm,torso_length_cm,inseam_cm,sleeve_length_cm,image_url
+9000000001,8000000001,M,top,STRETCHY,76,92,88,60,,62,https://example.com/images/variant-9000000001.jpg
+9000000002,8000000002,32,bottom,MODERATE,82,98,,,76,,https://example.com/images/variant-9000000002.jpg

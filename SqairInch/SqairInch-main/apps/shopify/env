@@ -1,0 +1,21 @@
+# Shopify App
+SHOPIFY_API_KEY=
+SHOPIFY_API_SECRET=
+SHOPIFY_SCOPES=read_products,write_products
+APP_URL=https://<your-tunnel-or-vercel-url>
+SHOPIFY_APP_URL=https://<your-tunnel-or-vercel-url>
+SESSION_SECRET=
+
+# Optional: restrict CSP frame-ancestors to a specific shop domain
+# (defaults to *.myshopify.com if unset)
+SHOPIFY_APP_SHOP=yourstore.myshopify.com
+
+# Supabase (server-only — never expose SERVICE_ROLE_KEY to browser)
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Widget CDN URL (public)
+NEXT_PUBLIC_WIDGET_URL=https://<your-cdn-or-vercel-url>/widget.js
+
+# Session data is stored in apps/shopify/.data/sessions.json (gitignored)
+# This file is created automatically on first OAuth install.

@@ -1,0 +1,80 @@
+{% if template.name == 'product' %}
+  <style>
+    .sqairinch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: 1px solid currentColor;
+      background: transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      color: inherit;
+      border-radius: 4px;
+      margin-top: 12px;
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+    .sqairinch-btn:hover,
+    .sqairinch-btn:focus-visible {
+      opacity: 0.75;
+    }
+    .sqairinch-btn:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+    #sqairinch-root {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      z-index: 2147483647;
+      overflow: visible;
+    }
+  </style>
+
+  <button
+    id="sqairinch-trigger"
+    class="sqairinch-btn"
+    type="button"
+    aria-haspopup="dialog"
+    data-sqairinch-trigger
+    data-widget-url="{{ block.settings.widget_bundle_url | escape }}"
+    data-shop="{{ shop.permanent_domain | json | escape }}"
+    data-product-id="{{ product.id }}"
+  >
+    {{- block.settings.button_text | escape -}}
+  </button>
+
+  <div
+    id="sqairinch-root"
+    aria-live="polite"
+    aria-atomic="true"
+  ></div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Sqairinch Try On",
+  "target": "body",
+  "javascript": "sqairinch-loader.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "widget_bundle_url",
+      "label": "Widget bundle URL",
+      "info": "URL to the Sqairinch widget IIFE bundle (e.g. https://cdn.example.com/widget.iife.js)",
+      "default": ""
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Button text",
+      "default": "Try On / Fit Check"
+    }
+  ]
+}
+{% endschema %}

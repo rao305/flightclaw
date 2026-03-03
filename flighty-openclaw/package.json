@@ -1,0 +1,24 @@
+{
+  "name": "flighty-openclaw",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --clean",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.10",
+    "tsup": "^8.3.6",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

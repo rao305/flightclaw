@@ -1,0 +1,9 @@
+{
+  "app": "flighty-openclaw",
+  "runtime": "openclaw",
+  "channels": ["whatsapp", "telegram", "discord", "slack"],
+  "jobs": {
+    "pollFlightsMs": 120000,
+    "pollPriceWatchesMs": 300000
+  }
+}
